@@ -23,6 +23,12 @@
     return String(title || '')
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, ' ')
+      // DOM textContent glues sizes/prices onto words with no separator
+      // ("Cauliflower1 each", "Strawberries16 oz", "$5.19Wegmans"). A word
+      // never legitimately mixes letters and digits in this domain, so treat
+      // every letter<->digit boundary as a word break.
+      .replace(/([a-z])(?=[0-9])/g, '$1 ')
+      .replace(/([0-9])(?=[a-z])/g, '$1 ')
       .replace(/\s+/g, ' ')
       .trim();
   }
@@ -32,8 +38,10 @@
     return new RegExp('(^|\\s)' + escaped + '(\\s|$)').test(haystack);
   }
 
+  // Test the NORMALIZED title: \b on the raw string misses glued textContent
+  // like "$6.49Organic…" (digit->letter is not a \b boundary).
   function isOrganic(title) {
-    return /\borganic\b/i.test(String(title || ''));
+    return containsPhrase(normalize(title), 'organic');
   }
 
   function looksProcessed(normalized) {

@@ -43,6 +43,12 @@ const SCREENSHOT_TILES = [
   ['Wegmans Cleaned & Cut Broccoli Florets, FAMILY PACK 3 lb', 'broccoli', 'moderate', false],
   // Anchor text carries price/size noise — classification must survive it.
   ['$5.19Wegmans Organic Cauliflower Florets10 oz', 'cauliflower', 'clean', true],
+  // textContent glues the size onto the LAST title word with no separator.
+  // These two are the live-bug tiles: the produce word ends the title, so the
+  // glued digit broke the whole-word match ("cauliflower1", "cauliflower16").
+  ['$4.29Wegmans Organic Cauliflower1 each', 'cauliflower', 'clean', true],
+  ['$2.99Wegmans Organic Frozen Riced Cauliflower16 oz', 'cauliflower', 'clean', true],
+  ['$6.49Organic Strawberries1 lb', 'strawberries', 'dirty', true],
 ];
 CASES.push(...SCREENSHOT_TILES);
 
@@ -54,6 +60,8 @@ const NON_MATCHES = [
   'Yellow Corn Tortilla Chips',
   'Cauliflower Pizza Crust, 10 oz',
   'Spinach & Artichoke Dip',
+  // Glued size must not break the NON_PRODUCE phrase match either.
+  'Organic Strawberry Ice Cream1 pt',
 ];
 
 let failed = 0;

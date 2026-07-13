@@ -32,11 +32,36 @@
     return links.filter((a) => !links.some((other) => other !== a && other.contains(a)));
   }
 
-  // The anchor's full text ("$5.19Wegmans Organic Cauliflower Florets10 oz") is
-  // noisier than a clean title but classify() matches on whole words, so the
-  // price and size are harmless — and this needs no per-layout title selector.
+  // The anchor's full text is noisier than a clean title but classify()
+  // matches on whole words, so price and size are harmless — IF they stay
+  // separate words. `textContent` concatenates adjacent elements with NO
+  // separator, so the size span glues onto the last title word:
+  //   "Wegmans Organic Cauliflower" + "1 each" -> "…Cauliflower1 each"
+  // and "cauliflower1" fails the whole-word matcher. That silently unbadged
+  // every tile whose title ENDED in the produce word (whole head "1 each",
+  // "Frozen Riced Cauliflower" + "16 oz") while "…Cauliflower Florets10 oz"
+  // kept working. So we pad each element's text with spaces; normalize()
+  // collapses the extras.
+  //
+  // Our own badge must also be excluded: every badge label contains the word
+  // "ORGANIC", so reading it back via textContent would flip a conventional
+  // Dirty Dozen item to an organic verdict on the next sweep.
+  function textWithoutBadges(node) {
+    if (node.nodeType === 3) return node.nodeValue || '';
+    if (node.nodeType !== 1) return '';
+    if (node.classList && node.classList.contains(BADGE_CLASS)) return '';
+    let text = '';
+    for (const child of node.childNodes) {
+      const t = textWithoutBadges(child);
+      // Space-pad element boundaries only — text nodes may legitimately split
+      // mid-word ("Driscoll" + "’s"), elements are layout boundaries.
+      text += child.nodeType === 1 ? ' ' + t + ' ' : t;
+    }
+    return text;
+  }
+
   function titleOf(link) {
-    return (link.textContent || '').trim() || link.getAttribute('aria-label') || '';
+    return textWithoutBadges(link).trim() || (link.getAttribute('aria-label') || '').trim();
   }
 
   function shouldBadge(verdict) {
@@ -51,17 +76,45 @@
     return el;
   }
 
+  // Idempotent per-sweep reconciliation of one tile. Two live-page realities
+  // make a write-once memo (the old `if (link.dataset[MARK]) return`) wrong:
+  //
+  //   1. Lazy-loaded tiles mount with PARTIAL non-empty text — a price, a
+  //      "Buy it again" chip — before the product name streams in. Classifying
+  //      that fragment yields null, and a permanent memo poisons the tile
+  //      forever ("Wegmans Organic Cauliflower", "…Frozen Riced Cauliflower").
+  //   2. Instacart is a React SPA: a re-render (image load, buy-again state)
+  //      can reconcile away our injected span and inline style while keeping
+  //      the anchor element — so "marked" never proves "still badged".
+  //
+  // So: re-derive the verdict from the CURRENT title every sweep and converge
+  // the DOM to it, touching the DOM only when it actually differs (otherwise
+  // each sweep's mutations would re-trigger the observer in a loop).
   function badgeLink(link) {
-    if (link.dataset[MARK]) return;
     const title = titleOf(link);
-    if (!title) return; // tile still skeleton-loading; leave unmarked so we retry
+    if (!title) return; // tile still skeleton-loading; retry on a later sweep
 
     const verdict = classify(title);
-    link.dataset[MARK] = verdict ? verdict.key : 'none';
-    if (!verdict || !shouldBadge(verdict)) return;
+    link.dataset[MARK] = verdict ? verdict.key : 'none'; // debug/popup breadcrumb only
+    const existing = link.querySelector('.' + BADGE_CLASS);
 
+    if (!verdict || !shouldBadge(verdict)) {
+      if (existing) existing.remove(); // verdict computed from an earlier partial title
+      return;
+    }
+
+    const badge = makeBadge(verdict);
+    if (existing) {
+      if (existing.className === badge.className && existing.textContent === badge.textContent) {
+        // Already correct — but re-assert positioning in case a re-render wiped
+        // the inline style and left the badge anchored to the wrong ancestor.
+        if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
+        return;
+      }
+      existing.remove();
+    }
     if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
-    link.appendChild(makeBadge(verdict));
+    link.appendChild(badge);
   }
 
   function sweep() {
@@ -113,5 +166,9 @@
   });
 
   sweep();
-  observer.observe(document.body, { childList: true, subtree: true });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+
+  // Test hook for test/content.dom.test.js (node vm + minimal DOM stub);
+  // inert in production.
+  window.__ioContentInternals = { productLinks, titleOf, badgeLink, sweep, collect };
 })();
