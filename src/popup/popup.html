@@ -7,9 +7,11 @@
   <body>
     <header>
       <h1>Organic Shopping Guide</h1>
+      <!-- Cart audit is built and message-wired but its cart-drawer detection
+           does not match Instacart's real DOM yet, so the button is withheld
+           rather than shipped broken. See tools/cart-probe.js. -->
       <div class="actions">
-        <button id="audit-cart">Audit cart</button>
-        <button id="scan-page" class="secondary">Scan page</button>
+        <button id="scan-page">Scan this page</button>
       </div>
     </header>
 

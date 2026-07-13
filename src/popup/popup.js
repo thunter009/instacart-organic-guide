@@ -8,7 +8,6 @@
     status: document.getElementById('status'),
     results: document.getElementById('results'),
     updated: document.getElementById('updated'),
-    auditCart: document.getElementById('audit-cart'),
     scanPage: document.getElementById('scan-page'),
   };
 
@@ -98,7 +97,6 @@
     render(res.items, res.scope);
   }
 
-  els.auditCart.addEventListener('click', () => ask('AUDIT_CART'));
   els.scanPage.addEventListener('click', () => ask('SCAN_PAGE'));
 
   // Dim (default) vs hide outright. Persisted so it survives the popup closing;

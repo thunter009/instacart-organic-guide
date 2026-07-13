@@ -1,7 +1,13 @@
 # Instacart Organic Guide
 
-Firefox extension. Badges produce on Instacart with EWG Dirty Dozen / Clean Fifteen
-verdicts, so you spend the organic premium only where residue data says it matters.
+Firefox extension. Greys out the produce on Instacart that you shouldn't buy conventional,
+so you spend the organic premium only where pesticide-residue data says it matters — and
+save it everywhere else.
+
+Organic costs 30–100% more. On the EWG's Clean Fifteen (cauliflower, avocados, onions,
+bananas…) that premium buys you close to nothing; on the Dirty Dozen (strawberries,
+spinach, grapes…) it buys you a lot. This extension makes that distinction visible while
+you shop, instead of asking you to memorize two lists.
 
 The page itself is the interface. Instead of badging every tile, it changes how tiles
 **look**, so your eye skips the wrong ones:
@@ -86,7 +92,27 @@ Both are pinned by tests.
 ## Known limits
 
 - Tile identification hangs on `a[href*="/products/"]`, far more stable than Instacart's
-  class names but still their DOM. `tileOf()` refuses to climb to any ancestor holding a
-  second product link, so a bad guess dims one tile instead of greying out the whole grid.
-- Cart audit needs the cart drawer open — the extension reads the DOM, not Instacart's
-  API — and its selectors are **not yet verified against the live cart.**
+  class names but still their DOM. When they redesign, this will need a fix. `tileOf()`
+  refuses to climb to any ancestor holding a second product link, so a bad guess dims one
+  tile instead of greying out the whole grid.
+- Matching is by product title, so a title that names produce in an unusual way can be
+  missed, and a *new* category of flavor/scent product could still slip through as a false
+  positive (an early build greyed out "Apple & Citrus Laundry Detergent"). Both are pinned
+  by tests as they're found — **if you hit one, open an issue with the product title.**
+- **Cart audit is built but disabled.** The code and message plumbing are in place, but its
+  cart-drawer detection doesn't match Instacart's real DOM, so the button is withheld
+  rather than shipped broken. `tools/cart-probe.js` is a read-only console probe for
+  capturing the real cart structure — PRs welcome.
+
+## Disclaimer
+
+Not affiliated with, endorsed by, or connected to **Instacart** or the **Environmental
+Working Group**. "Dirty Dozen" and "Clean Fifteen" are trademarks of EWG; this is an
+independent tool that surfaces their published guidance while you shop. Rankings are a
+bundled snapshot of [EWG's Shopper's Guide](https://www.ewg.org/foodnews/) — go read the
+original, and note that EWG's methodology has its own critics. Eating conventionally grown
+fruit and vegetables is far better than eating none.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
