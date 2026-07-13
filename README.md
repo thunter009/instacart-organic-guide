@@ -3,9 +3,15 @@
 Firefox extension. Badges produce on Instacart with EWG Dirty Dozen / Clean Fifteen
 verdicts, so you spend the organic premium only where residue data says it matters.
 
-- **Inline badges** on product tiles as you browse: red `BUY ORGANIC` (Dirty Dozen),
-  amber `PREFER ORGANIC` (recently dirty), green `CONVENTIONAL OK` (Clean Fifteen /
-  middle of the pack), dark green `✓ ORGANIC` if the item already is.
+- **Inline badges** on product tiles as you browse, and only where there's something
+  to act on: red `BUY ORGANIC` (Dirty Dozen), amber `PREFER ORGANIC` (recently dirty),
+  dark green `✓ ORGANIC` if the item already is. Clean and middle-of-the-pack produce
+  is deliberately left unbadged — **an unbadged tile means conventional is fine.**
+  Badging everything just reprints "CONVENTIONAL OK" on every tile of a cauliflower
+  search, which is noise.
+- **Prepared forms count as the vegetable.** Riced, steamable, frozen, and pre-cut
+  cauliflower classify the same as the fresh head; residue carries through. Only genuinely
+  different products (juice, sauce, pizza crust, shampoo) are skipped.
 - **Cart audit** in the toolbar popup: lists the conventional items in your cart that
   are worth swapping to organic.
 - **Staleness warning**: EWG republishes annually. The popup warns loudly once the

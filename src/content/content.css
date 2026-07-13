@@ -12,8 +12,8 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 
+/* Only actionable verdicts are badged; clean/moderate produce is left alone, so
+   an unbadged tile reads as "conventional is fine". */
 .io-badge--dirty { background: #c0281c; }
 .io-badge--caution { background: #b26a00; }
-.io-badge--moderate { background: #5c6670; }
-.io-badge--clean { background: #1f7a3d; }
 .io-badge--organic { background: #0f5132; }

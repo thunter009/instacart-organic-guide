@@ -80,11 +80,14 @@
     { key: 'artichoke', label: 'Artichoke', tier: 'moderate', aliases: ['artichoke', 'artichokes'] },
   ];
 
+  // `badge` doubles as the inline pill text (dirty/caution only — clean and
+  // moderate are left unbadged on the page) and the popup's section heading,
+  // so the four labels must read as four distinct verdicts.
   const TIERS = {
     dirty: { badge: 'BUY ORGANIC', advice: 'Dirty Dozen — highest pesticide residue.' },
     caution: { badge: 'PREFER ORGANIC', advice: 'High residue; on the Dirty Dozen in a recent year.' },
     moderate: { badge: 'CONVENTIONAL OK', advice: 'Middle of the pack — organic is optional.' },
-    clean: { badge: 'CONVENTIONAL OK', advice: 'Clean Fifteen — lowest pesticide residue.' },
+    clean: { badge: 'CLEAN FIFTEEN', advice: 'Lowest pesticide residue — save your money.' },
   };
 
   function daysSinceUpdate(now) {

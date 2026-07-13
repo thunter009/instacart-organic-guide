@@ -27,12 +27,33 @@ const CASES = [
   ['Organic Baby Spinach, 5 oz', 'spinach', 'dirty', true],
 ];
 
+// Real tiles from a Wegmans "cauliflower" search. Prepared forms are still the
+// vegetable, so they must classify identically to the fresh head.
+const SCREENSHOT_TILES = [
+  ['Wegmans Organic Cauliflower 1 each', 'cauliflower', 'clean', true],
+  ['Wegmans Cauliflower 1 each', 'cauliflower', 'clean', false],
+  ['Wegmans Organic Cauliflower Florets 10 oz', 'cauliflower', 'clean', true],
+  ['Wegmans Cauliflower Florets, FAMILY PACK 2 lb', 'cauliflower', 'clean', false],
+  ['Wegmans Cleaned & Cut Cauliflower Florets 12 oz', 'cauliflower', 'clean', false],
+  ['Wegmans Steamable Cauliflower Florets 12 oz', 'cauliflower', 'clean', false],
+  ['Wegmans Cauliflower Pearls 16 oz', 'cauliflower', 'clean', false],
+  ['Wegmans Organic Frozen Riced Cauliflower 16 oz', 'cauliflower', 'clean', true],
+  ['Wegmans Organic Cauliflower Rice 10 oz', 'cauliflower', 'clean', true],
+  ['Broccoli Crowns $2.29 / lb', 'broccoli', 'moderate', false],
+  ['Wegmans Cleaned & Cut Broccoli Florets, FAMILY PACK 3 lb', 'broccoli', 'moderate', false],
+  // Anchor text carries price/size noise — classification must survive it.
+  ['$5.19Wegmans Organic Cauliflower Florets10 oz', 'cauliflower', 'clean', true],
+];
+CASES.push(...SCREENSHOT_TILES);
+
 const NON_MATCHES = [
   'Simply Orange Juice, 52 fl oz',
   'Strawberry Ice Cream, 1 pt',
   'Apple Cider Vinegar',
   'Tomato Sauce, 24 oz',
   'Yellow Corn Tortilla Chips',
+  'Cauliflower Pizza Crust, 10 oz',
+  'Spinach & Artichoke Dip',
 ];
 
 let failed = 0;

@@ -4,14 +4,19 @@
 
   const { PRODUCE, TIERS } = root.ProduceData;
 
-  // Titles that are clearly not fresh produce, even though they name a fruit.
-  // Residue rankings apply to the fresh item, so don't badge processed goods.
+  // Titles that name a fruit or vegetable but aren't the produce itself — the
+  // residue rankings don't transfer to juice or shampoo.
+  //
+  // Prepared forms of the vegetable (riced, steamable, frozen florets, pearls,
+  // pre-cut) are NOT listed here: that's still cauliflower, and the pesticide
+  // advice still applies. Matched as whole words — a substring check reads "tea"
+  // inside "steamable" and silently drops the tile.
   const NON_PRODUCE = [
-    'juice', 'jam', 'jelly', 'preserve', 'yogurt', 'ice cream', 'smoothie', 'candle',
-    'soap', 'shampoo', 'lotion', 'candy', 'gummy', 'soda', 'seltzer', 'sparkling',
-    'flavored', 'scented', 'pie', 'cake', 'cookie', 'cereal', 'bar', 'chips', 'crisps',
+    'juice', 'jam', 'jelly', 'preserve', 'preserves', 'yogurt', 'ice cream', 'smoothie',
+    'candle', 'soap', 'shampoo', 'lotion', 'candy', 'gummy', 'gummies', 'soda', 'seltzer',
+    'flavored', 'scented', 'pie', 'cake', 'cookie', 'cookies', 'cereal', 'chips', 'crisps',
     'sauce', 'salsa', 'dressing', 'vinegar', 'oil', 'extract', 'syrup', 'tea', 'kombucha',
-    'supplement', 'vitamin', 'puree', 'baby food', 'pouch', 'canned', 'dried', 'freeze dried',
+    'supplement', 'vitamin', 'vitamins', 'jerky', 'pizza', 'crust', 'hummus', 'dip',
   ];
 
   function normalize(title) {
@@ -32,7 +37,7 @@
   }
 
   function looksProcessed(normalized) {
-    return NON_PRODUCE.some((word) => normalized.includes(word));
+    return NON_PRODUCE.some((phrase) => containsPhrase(normalized, phrase));
   }
 
   // Returns { entry, tier, badge, advice, organic, matchedAlias } or null.

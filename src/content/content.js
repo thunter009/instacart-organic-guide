@@ -1,5 +1,9 @@
 // Injects verdict badges onto Instacart product tiles and answers scan/audit
 // requests from the popup.
+//
+// Badging is deliberately quiet: only items worth acting on get a badge (buy
+// organic / prefer organic), plus a check on items that already are organic.
+// An unbadged tile means "conventional is fine" — silence is the signal.
 (function () {
   'use strict';
 
@@ -7,22 +11,12 @@
   const BADGE_CLASS = 'io-badge';
   const MARK = 'ioBadged';
 
-  // Instacart ships several card layouts (search grid, aisle carousel, cart
-  // drawer, checkout list). Selectors are best-effort and ordered most-specific
-  // first; the generic fallback catches layouts we don't know about.
-  const CARD_SELECTORS = [
-    '[data-testid^="item_list_item"]',
-    '[data-testid="item-card"]',
-    '[data-testid^="product-card"]',
-    'li[data-testid][role="listitem"]',
-  ];
-  const TITLE_SELECTORS = [
-    '[data-testid="item-name"]',
-    '[data-testid="itemCardName"]',
-    'h3',
-    'h4',
-    'a[href*="/products/"]',
-  ];
+  // Every product tile — grid, carousel, cart drawer, checkout — wraps its
+  // content in a link to /products/. Anchoring to that instead of guessing at
+  // card container classes makes badging independent of tile layout, which is
+  // what broke whole-head items ("1 each") while bagged florets worked.
+  const PRODUCT_LINK = 'a[href*="/products/"]';
+
   const CART_SELECTORS = [
     '[data-testid="cart-sidesheet"]',
     '[data-testid="cart-side-sheet"]',
@@ -30,54 +24,48 @@
     '[data-testid*="order-item-list"]',
   ];
 
-  function cards(root) {
+  function productLinks(root) {
     const scope = root || document;
-    const found = new Set();
-    for (const sel of CARD_SELECTORS) {
-      scope.querySelectorAll(sel).forEach((el) => found.add(el));
-    }
-    if (found.size === 0) {
-      // Fallback: any product link, badged on its nearest list-ish ancestor.
-      scope.querySelectorAll('a[href*="/products/"]').forEach((a) => {
-        found.add(a.closest('li, article, [class*="card" i]') || a);
-      });
-    }
-    return [...found];
+    const links = [...scope.querySelectorAll(PRODUCT_LINK)];
+    // Instacart sometimes nests a second product link inside a tile; badge only
+    // the outermost so a tile never gets two pills.
+    return links.filter((a) => !links.some((other) => other !== a && other.contains(a)));
   }
 
-  function titleOf(card) {
-    for (const sel of TITLE_SELECTORS) {
-      const el = card.querySelector(sel);
-      const text = el && el.textContent.trim();
-      if (text) return text;
-    }
-    return card.getAttribute('aria-label') || '';
+  // The anchor's full text ("$5.19Wegmans Organic Cauliflower Florets10 oz") is
+  // noisier than a clean title but classify() matches on whole words, so the
+  // price and size are harmless — and this needs no per-layout title selector.
+  function titleOf(link) {
+    return (link.textContent || '').trim() || link.getAttribute('aria-label') || '';
+  }
+
+  function shouldBadge(verdict) {
+    return verdict.organic || verdict.tier === 'dirty' || verdict.tier === 'caution';
   }
 
   function makeBadge(verdict) {
-    const el = document.createElement('div');
+    const el = document.createElement('span');
     el.className = `${BADGE_CLASS} ${BADGE_CLASS}--${verdict.organic ? 'organic' : verdict.tier}`;
     el.textContent = verdict.organic ? '✓ ORGANIC' : verdict.badge;
     el.title = `${verdict.label} — ${verdict.advice}`;
     return el;
   }
 
-  function badgeCard(card) {
-    if (card.dataset[MARK]) return null;
-    const title = titleOf(card);
-    if (!title) return null;
+  function badgeLink(link) {
+    if (link.dataset[MARK]) return;
+    const title = titleOf(link);
+    if (!title) return; // tile still skeleton-loading; leave unmarked so we retry
 
     const verdict = classify(title);
-    card.dataset[MARK] = verdict ? verdict.key : 'none';
-    if (!verdict) return null;
+    link.dataset[MARK] = verdict ? verdict.key : 'none';
+    if (!verdict || !shouldBadge(verdict)) return;
 
-    if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
-    card.appendChild(makeBadge(verdict));
-    return { title, ...verdict };
+    if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
+    link.appendChild(makeBadge(verdict));
   }
 
   function sweep() {
-    cards().forEach(badgeCard);
+    productLinks().forEach(badgeLink);
   }
 
   // Instacart is a SPA and lazy-loads tiles on scroll; re-sweep on DOM churn.
@@ -92,13 +80,13 @@
 
   function collect(root) {
     const items = [];
-    for (const card of cards(root)) {
-      const title = titleOf(card);
+    for (const link of productLinks(root)) {
+      const title = titleOf(link);
       if (!title) continue;
       const verdict = classify(title);
       if (verdict) items.push({ title, ...verdict });
     }
-    // De-dupe: carousels repeat the same product in multiple rails.
+    // De-dupe: carousels repeat the same product across rails.
     const seen = new Set();
     return items.filter((i) => (seen.has(i.title) ? false : seen.add(i.title)));
   }
