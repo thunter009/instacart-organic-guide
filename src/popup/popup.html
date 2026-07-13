@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>Organic Shopping Guide</h1>
+      <div class="actions">
+        <button id="audit-cart">Audit cart</button>
+        <button id="scan-page" class="secondary">Scan page</button>
+      </div>
+    </header>
+
+    <div id="stale" class="stale" hidden></div>
+    <div id="status" class="status"></div>
+    <div id="results"></div>
+
+    <footer>
+      <span id="updated"></span>
+      <a href="https://www.ewg.org/foodnews/" target="_blank" rel="noreferrer">EWG source</a>
+    </footer>
+
+    <script src="../data/produce.js"></script>
+    <script src="../lib/match.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

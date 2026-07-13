@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Instacart Organic Guide",
+  "version": "0.1.0",
+  "description": "Badges Instacart produce with EWG Dirty Dozen / Clean Fifteen verdicts and audits your cart for organic swaps.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "instacart-organic@hunter.xyz",
+      "strict_min_version": "115.0"
+    }
+  },
+  "permissions": ["tabs"],
+  "host_permissions": ["*://*.instacart.com/*"],
+  "content_scripts": [
+    {
+      "matches": ["*://*.instacart.com/*"],
+      "js": ["src/data/produce.js", "src/lib/match.js", "src/content/content.js"],
+      "css": ["src/content/content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Organic Shopping Guide",
+    "default_popup": "src/popup/popup.html"
+  }
+}
