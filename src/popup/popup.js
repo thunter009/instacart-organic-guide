@@ -101,5 +101,23 @@
   els.auditCart.addEventListener('click', () => ask('AUDIT_CART'));
   els.scanPage.addEventListener('click', () => ask('SCAN_PAGE'));
 
+  // Dim (default) vs hide outright. Persisted so it survives the popup closing;
+  // pushed to the open tab so the grid updates without a reload.
+  const hideMode = document.getElementById('hide-mode');
+  browser.storage.local.get({ hideMode: false })
+    .then((cfg) => { hideMode.checked = !!cfg.hideMode; })
+    .catch(() => { hideMode.checked = false; });
+  hideMode.addEventListener('change', async () => {
+    await browser.storage.local.set({ hideMode: hideMode.checked });
+    const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    if (tab && /instacart\.com/.test(tab.url || '')) {
+      try {
+        await browser.tabs.sendMessage(tab.id, { type: 'SET_MODE', hideMode: hideMode.checked });
+      } catch (e) {
+        els.status.textContent = 'Reload the Instacart tab to apply.';
+      }
+    }
+  });
+
   renderStaleness();
 })();

@@ -41,8 +41,11 @@ class Element {
   }
   get classList() {
     const self = this;
+    const parts = () => String(self.className).split(/\s+/).filter(Boolean);
     return {
-      contains: (c) => String(self.className).split(/\s+/).includes(c),
+      contains: (c) => parts().includes(c),
+      add: (c) => { if (!parts().includes(c)) self.className = [...parts(), c].join(' '); },
+      remove: (c) => { self.className = parts().filter((p) => p !== c).join(' '); },
     };
   }
   setAttribute(name, value) { this.attrs[name] = String(value); }
@@ -111,14 +114,17 @@ const sandbox = {
   document: documentStub,
   getComputedStyle: (el) => ({ position: el.style.position || 'static' }),
   MutationObserver: class { constructor() {} observe() {} disconnect() {} },
-  browser: { runtime: { onMessage: { addListener() {} } } },
+  browser: {
+    runtime: { onMessage: { addListener() {} } },
+    storage: { local: { get: (d) => Promise.resolve(d), set: () => Promise.resolve() } },
+  },
 };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 for (const f of ['src/data/produce.js', 'src/lib/match.js', 'src/content/content.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', f), 'utf8'), sandbox, { filename: f });
 }
-const { sweep, titleOf, productLinks } = sandbox.window.__ioContentInternals;
+const { sweep, titleOf, productLinks, tileOf, setHideMode } = sandbox.window.__ioContentInternals;
 
 // ---------------------------------------------------------------------------
 // Fixture builders — shapes taken from the live Wegmans "cauliflower" grid.
@@ -197,15 +203,21 @@ sweep();
 check('badge re-injected after React re-render removed it', badgesIn(florets).length === 1);
 check('position re-asserted after re-render', florets.style.position === 'relative');
 
-// --- 5. Our own badge text must not contaminate re-classification -----------
+// --- 5. Conventional Dirty Dozen is DEMOTED, not badged ----------------------
+// An organic strawberry (tile 104) is already on the page, so a conventional
+// one has somewhere better to send the shopper.
 const conventional = fullTile('/store/items/products/105', '$3.99', 'Driscoll’s Strawberries', '16 oz');
 sweep();
-const firstBadge = badgesIn(conventional)[0];
-check('conventional dirty item badged BUY ORGANIC', firstBadge && firstBadge.textContent === 'BUY ORGANIC');
+const convTile = tileOf(conventional);
+check('conventional dirty item greyed out', convTile.classList.contains('io-demote--strong'));
+check('conventional dirty item carries no badge', badgesIn(conventional).length === 0);
+check('organic sibling keeps its ✓ ORGANIC', badgesIn(skeleton).length === 1);
+check('organic item is never demoted', !tileOf(skeleton).classList.contains('io-demote--strong'));
+
 sweep(); sweep();
-check('title excludes injected badge text', !/BUY ORGANIC/.test(titleOf(conventional)));
-check('badge does not flip to ✓ ORGANIC on later sweeps',
-  badgesIn(conventional).length === 1 && badgesIn(conventional)[0].textContent === 'BUY ORGANIC');
+check('title excludes injected badge text', !/ORGANIC/.test(titleOf(skeleton).replace(/Organic/g, '')));
+check('demote class not duplicated across sweeps',
+  (convTile.className.match(/io-demote--strong/g) || []).length === 1);
 
 // --- 6. Sweeps are idempotent: never a second badge --------------------------
 sweep(); sweep(); sweep();
@@ -243,6 +255,63 @@ morphing.addText(' Ice Cream1 pt');
 sweep();
 check('stale badge removed when full title reveals non-produce', badgesIn(morphing).length === 0);
 
-const TOTAL = 18;
+// --- 10. Escape hatch: no organic alternative on the page -> don't demote -----
+// A store with no organic peaches must not render a wall of grey with nothing
+// to switch to. Leave the tiles alone and say so instead.
+const peachA = fullTile('/store/items/products/201', '$4.99', 'Wegmans Peaches', '2 lb');
+const peachB = fullTile('/store/items/products/202', '$5.99', 'Yellow Peaches', '3 lb');
+sweep();
+check('sole-option peaches are NOT greyed out',
+  !tileOf(peachA).classList.contains('io-demote--strong') &&
+  !tileOf(peachB).classList.contains('io-demote--strong'));
+check('sole-option peaches explain themselves',
+  peachA.querySelectorAll('.io-note').length === 1 &&
+  peachA.querySelectorAll('.io-note')[0].textContent === 'NO ORGANIC OPTION');
+
+// ...until an organic peach lazy-loads in, which flips the whole group.
+const peachOrganic = fullTile('/store/items/products/203', '$7.99', 'Wegmans Organic Peaches', '2 lb');
+sweep();
+check('organic peach arriving flips the group to demoted',
+  tileOf(peachA).classList.contains('io-demote--strong') &&
+  tileOf(peachB).classList.contains('io-demote--strong'));
+check('"no organic option" note removed once an alternative exists',
+  peachA.querySelectorAll('.io-note').length === 0);
+check('the organic peach itself is badged, not demoted',
+  badgesIn(peachOrganic).length === 1 &&
+  !tileOf(peachOrganic).classList.contains('io-demote--strong'));
+
+// --- 11. Caution tier gets the LIGHT treatment, not the strong one ------------
+const organicPepper = fullTile('/store/items/products/301', '$2.99', 'Organic Bell Pepper', '1 each');
+const plainPepper = fullTile('/store/items/products/302', '$1.49', 'Green Bell Pepper', '1 each');
+sweep();
+check('caution tier dimmed lightly', tileOf(plainPepper).classList.contains('io-demote--light'));
+check('caution tier NOT greyed like Dirty Dozen',
+  !tileOf(plainPepper).classList.contains('io-demote--strong'));
+check('organic pepper badged', badgesIn(organicPepper).length === 1);
+
+// --- 12. Hide mode removes Dirty Dozen only, and is reversible ----------------
+setHideMode(true);
+sweep();
+check('hide mode hides conventional Dirty Dozen', tileOf(conventional).classList.contains('io-hidden'));
+check('hide mode does NOT hide the caution tier', !tileOf(plainPepper).classList.contains('io-hidden'));
+check('hide mode does NOT hide organic items', !tileOf(skeleton).classList.contains('io-hidden'));
+setHideMode(false);
+sweep();
+check('toggling hide mode off restores the tile', !tileOf(conventional).classList.contains('io-hidden'));
+
+// --- 13. The guard that stops us greying out the entire grid ------------------
+// tileOf climbs to the largest ancestor holding exactly ONE product link. The
+// grid container holds many, so it must never be selected — otherwise a single
+// conventional strawberry greys out every result on the page.
+check('tileOf never climbs to an ancestor containing other products',
+  body.querySelectorAll('a[href*="/products/"]').length > 1 &&
+  tileOf(conventional) !== body &&
+  tileOf(conventional).querySelectorAll('a[href*="/products/"]').length === 1);
+check('demoting one tile leaves its neighbours untouched',
+  !tileOf(peachOrganic).classList.contains('io-demote--strong') &&
+  !tileOf(cleanTile).classList.contains('io-demote--strong') &&
+  !tileOf(cleanTile).classList.contains('io-demote--light'));
+
+const TOTAL = 33;
 console.log(`\n${TOTAL - failed}/${TOTAL} passed`);
 process.exit(failed ? 1 : 0);

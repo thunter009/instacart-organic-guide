@@ -1,20 +1,27 @@
-// Injects verdict badges onto Instacart product tiles and answers scan/audit
-// requests from the popup.
+// Demotes Instacart produce you shouldn't buy conventional, and answers
+// scan/audit requests from the popup.
 //
-// Badging is deliberately quiet: only items worth acting on get a badge (buy
-// organic / prefer organic), plus a check on items that already are organic.
-// An unbadged tile means "conventional is fine" — silence is the signal.
+// The page itself is the interface. Rather than badge every tile, we change how
+// tiles LOOK so the eye skips the wrong ones:
+//
+//   conventional Dirty Dozen  -> greyed + faded (or hidden, if the user asks)
+//   conventional caution tier -> lightly faded ("meh", not "no")
+//   organic (any tier)        -> ✓ ORGANIC check, the thing to steer toward
+//   clean / moderate          -> untouched. Silence means conventional is fine.
+//
+// Demotion is never absolute: a dimmed tile restores on hover and stays
+// clickable, so the user can always overrule us.
 (function () {
   'use strict';
 
   const { classify } = window.ProduceMatch;
   const BADGE_CLASS = 'io-badge';
+  const NOTE_CLASS = 'io-note';
   const MARK = 'ioBadged';
 
   // Every product tile — grid, carousel, cart drawer, checkout — wraps its
   // content in a link to /products/. Anchoring to that instead of guessing at
-  // card container classes makes badging independent of tile layout, which is
-  // what broke whole-head items ("1 each") while bagged florets worked.
+  // card container classes makes this independent of tile layout.
   const PRODUCT_LINK = 'a[href*="/products/"]';
 
   const CART_SELECTORS = [
@@ -24,37 +31,49 @@
     '[data-testid*="order-item-list"]',
   ];
 
+  let hideMode = false; // false = dim (default), true = remove from the grid
+
   function productLinks(root) {
     const scope = root || document;
     const links = [...scope.querySelectorAll(PRODUCT_LINK)];
-    // Instacart sometimes nests a second product link inside a tile; badge only
-    // the outermost so a tile never gets two pills.
+    // Instacart sometimes nests a second product link inside a tile; keep only
+    // the outermost so a tile is never processed twice.
     return links.filter((a) => !links.some((other) => other !== a && other.contains(a)));
   }
 
-  // The anchor's full text is noisier than a clean title but classify()
-  // matches on whole words, so price and size are harmless — IF they stay
-  // separate words. `textContent` concatenates adjacent elements with NO
-  // separator, so the size span glues onto the last title word:
+  // Dimming has to apply to the whole tile (image, name, price), not just the
+  // <a>. Climb from the link to the largest ancestor that still contains
+  // exactly ONE product link — the moment an ancestor wraps a second product,
+  // we've left the tile and are about to grey out the entire grid.
+  function tileOf(link) {
+    let best = link;
+    let node = link.parentNode;
+    for (let depth = 0; node && node.nodeType === 1 && node !== document.body && depth < 8; depth++) {
+      if (node.querySelectorAll(PRODUCT_LINK).length !== 1) break;
+      best = node;
+      node = node.parentNode;
+    }
+    return best;
+  }
+
+  // `textContent` concatenates adjacent elements with NO separator, so the size
+  // span glues onto the last title word:
   //   "Wegmans Organic Cauliflower" + "1 each" -> "…Cauliflower1 each"
-  // and "cauliflower1" fails the whole-word matcher. That silently unbadged
-  // every tile whose title ENDED in the produce word (whole head "1 each",
-  // "Frozen Riced Cauliflower" + "16 oz") while "…Cauliflower Florets10 oz"
-  // kept working. So we pad each element's text with spaces; normalize()
-  // collapses the extras.
+  // and "cauliflower1" fails the whole-word matcher — which silently skipped
+  // every tile whose title ENDED in the produce word. Pad element boundaries;
+  // normalize() collapses the extras.
   //
-  // Our own badge must also be excluded: every badge label contains the word
-  // "ORGANIC", so reading it back via textContent would flip a conventional
-  // Dirty Dozen item to an organic verdict on the next sweep.
+  // Our own badge is excluded: its label contains "ORGANIC", so reading it back
+  // would flip a conventional item to an organic verdict on the next sweep.
   function textWithoutBadges(node) {
     if (node.nodeType === 3) return node.nodeValue || '';
     if (node.nodeType !== 1) return '';
-    if (node.classList && node.classList.contains(BADGE_CLASS)) return '';
+    if (node.classList && (node.classList.contains(BADGE_CLASS) || node.classList.contains(NOTE_CLASS))) return '';
     let text = '';
     for (const child of node.childNodes) {
       const t = textWithoutBadges(child);
       // Space-pad element boundaries only — text nodes may legitimately split
-      // mid-word ("Driscoll" + "’s"), elements are layout boundaries.
+      // mid-word ("Driscoll" + "’s"); elements are layout boundaries.
       text += child.nodeType === 1 ? ' ' + t + ' ' : t;
     }
     return text;
@@ -64,61 +83,110 @@
     return textWithoutBadges(link).trim() || (link.getAttribute('aria-label') || '').trim();
   }
 
-  function shouldBadge(verdict) {
-    return verdict.organic || verdict.tier === 'dirty' || verdict.tier === 'caution';
+  // What this tile should look like, given its verdict and whether an organic
+  // alternative for the same produce exists anywhere on the page.
+  //
+  // `hasOrganicAlt` is the escape hatch: if the store stocks no organic
+  // strawberries, dimming every strawberry leaves a wall of grey and no way
+  // forward. In that case we leave the tiles alone and say so instead.
+  function desiredState(verdict, hasOrganicAlt) {
+    if (!verdict) return { badge: null, demote: null, hidden: false };
+    if (verdict.organic) return { badge: 'organic', demote: null, hidden: false };
+
+    const actionable = verdict.tier === 'dirty' || verdict.tier === 'caution';
+    if (!actionable) return { badge: null, demote: null, hidden: false };
+
+    if (!hasOrganicAlt) {
+      // Nothing better to switch to — don't punish the only option available.
+      return { badge: verdict.tier === 'dirty' ? 'note' : null, demote: null, hidden: false };
+    }
+    return {
+      badge: null,
+      demote: verdict.tier === 'dirty' ? 'strong' : 'light',
+      hidden: hideMode && verdict.tier === 'dirty',
+    };
   }
 
-  function makeBadge(verdict) {
+  function makeBadge(verdict, kind) {
     const el = document.createElement('span');
-    el.className = `${BADGE_CLASS} ${BADGE_CLASS}--${verdict.organic ? 'organic' : verdict.tier}`;
-    el.textContent = verdict.organic ? '✓ ORGANIC' : verdict.badge;
+    if (kind === 'note') {
+      el.className = NOTE_CLASS;
+      el.textContent = 'NO ORGANIC OPTION';
+      el.title = `${verdict.label} — ${verdict.advice} No organic alternative on this page.`;
+      return el;
+    }
+    el.className = `${BADGE_CLASS} ${BADGE_CLASS}--organic`;
+    el.textContent = '✓ ORGANIC';
     el.title = `${verdict.label} — ${verdict.advice}`;
     return el;
   }
 
-  // Idempotent per-sweep reconciliation of one tile. Two live-page realities
-  // make a write-once memo (the old `if (link.dataset[MARK]) return`) wrong:
+  const DEMOTE_CLASSES = ['io-demote--strong', 'io-demote--light'];
+
+  // Converge one tile's DOM to `state`, touching it only where it differs.
+  // Idempotence is load-bearing: every mutation we make re-triggers the
+  // MutationObserver, so a sweep that always writes would loop forever.
   //
-  //   1. Lazy-loaded tiles mount with PARTIAL non-empty text — a price, a
-  //      "Buy it again" chip — before the product name streams in. Classifying
-  //      that fragment yields null, and a permanent memo poisons the tile
-  //      forever ("Wegmans Organic Cauliflower", "…Frozen Riced Cauliflower").
-  //   2. Instacart is a React SPA: a re-render (image load, buy-again state)
-  //      can reconcile away our injected span and inline style while keeping
-  //      the anchor element — so "marked" never proves "still badged".
-  //
-  // So: re-derive the verdict from the CURRENT title every sweep and converge
-  // the DOM to it, touching the DOM only when it actually differs (otherwise
-  // each sweep's mutations would re-trigger the observer in a loop).
-  function badgeLink(link) {
-    const title = titleOf(link);
-    if (!title) return; // tile still skeleton-loading; retry on a later sweep
+  // It also can't be a write-once memo. Two live-page realities break that:
+  //   1. Lazy tiles mount with PARTIAL text (a price, a "Buy it again" chip)
+  //      before the name streams in — classifying that fragment yields null and
+  //      a permanent memo would poison the tile forever.
+  //   2. Instacart is React: a re-render can reconcile away our injected span
+  //      while keeping the anchor, so "marked" never proves "still styled".
+  function applyTile(link, verdict, hasOrganicAlt) {
+    const state = desiredState(verdict, hasOrganicAlt);
+    const tile = tileOf(link);
 
-    const verdict = classify(title);
-    link.dataset[MARK] = verdict ? verdict.key : 'none'; // debug/popup breadcrumb only
-    const existing = link.querySelector('.' + BADGE_CLASS);
-
-    if (!verdict || !shouldBadge(verdict)) {
-      if (existing) existing.remove(); // verdict computed from an earlier partial title
-      return;
-    }
-
-    const badge = makeBadge(verdict);
-    if (existing) {
-      if (existing.className === badge.className && existing.textContent === badge.textContent) {
-        // Already correct — but re-assert positioning in case a re-render wiped
-        // the inline style and left the badge anchored to the wrong ancestor.
+    const existing = link.querySelector('.' + BADGE_CLASS) || link.querySelector('.' + NOTE_CLASS);
+    if (state.badge) {
+      const wanted = makeBadge(verdict, state.badge);
+      if (!existing || existing.className !== wanted.className || existing.textContent !== wanted.textContent) {
+        if (existing) existing.remove();
         if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
-        return;
+        link.appendChild(wanted);
+      } else if (getComputedStyle(link).position === 'static') {
+        link.style.position = 'relative'; // re-render wiped our inline style
       }
+    } else if (existing) {
       existing.remove();
     }
-    if (getComputedStyle(link).position === 'static') link.style.position = 'relative';
-    link.appendChild(badge);
+
+    const wantedDemote = state.demote ? `io-demote--${state.demote}` : null;
+    for (const cls of DEMOTE_CLASSES) {
+      if (cls !== wantedDemote && tile.classList.contains(cls)) tile.classList.remove(cls);
+    }
+    if (wantedDemote && !tile.classList.contains(wantedDemote)) tile.classList.add(wantedDemote);
+
+    if (state.hidden && !tile.classList.contains('io-hidden')) tile.classList.add('io-hidden');
+    if (!state.hidden && tile.classList.contains('io-hidden')) tile.classList.remove('io-hidden');
   }
 
   function sweep() {
-    productLinks().forEach(badgeLink);
+    const links = productLinks();
+
+    // Pass 1: classify. A tile whose title hasn't streamed in yet is skipped
+    // entirely (not marked), so a later sweep retries it.
+    const seen = [];
+    for (const link of links) {
+      const title = titleOf(link);
+      if (!title) continue;
+      const verdict = classify(title);
+      link.dataset[MARK] = verdict ? verdict.key : 'none'; // debug breadcrumb
+      seen.push({ link, verdict });
+    }
+
+    // Pass 2: does an organic alternative exist on this page, per produce type?
+    // Recomputed every sweep so an organic tile that lazy-loads in later can
+    // flip its group from "leave alone" to "demote".
+    const hasOrganic = new Set();
+    for (const { verdict } of seen) {
+      if (verdict && verdict.organic) hasOrganic.add(verdict.key);
+    }
+
+    // Pass 3: converge.
+    for (const { link, verdict } of seen) {
+      applyTile(link, verdict, verdict ? hasOrganic.has(verdict.key) : false);
+    }
   }
 
   // Instacart is a SPA and lazy-loads tiles on scroll; re-sweep on DOM churn.
@@ -153,6 +221,11 @@
   }
 
   browser.runtime.onMessage.addListener((msg) => {
+    if (msg.type === 'SET_MODE') {
+      hideMode = msg.hideMode;
+      sweep();
+      return Promise.resolve({ ok: true });
+    }
     if (msg.type === 'SCAN_PAGE') {
       sweep();
       return Promise.resolve({ scope: 'page', items: collect(document) });
@@ -165,10 +238,21 @@
     return undefined;
   });
 
+  if (typeof browser !== 'undefined' && browser.storage) {
+    // Falling back to dim-mode on a storage failure is the safe default: it
+    // shows every tile. Silently hiding items because we couldn't read a pref
+    // would be the worst outcome.
+    browser.storage.local.get({ hideMode: false })
+      .then((cfg) => { hideMode = !!cfg.hideMode; sweep(); })
+      .catch(() => { hideMode = false; });
+  }
+
   sweep();
   observer.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-  // Test hook for test/content.dom.test.js (node vm + minimal DOM stub);
-  // inert in production.
-  window.__ioContentInternals = { productLinks, titleOf, badgeLink, sweep, collect };
+  // Test hook for test/content.dom.test.js; inert in production.
+  window.__ioContentInternals = {
+    productLinks, titleOf, tileOf, sweep, collect,
+    setHideMode: (v) => { hideMode = v; },
+  };
 })();
