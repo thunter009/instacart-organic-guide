@@ -4,20 +4,40 @@
 
   const { PRODUCE, TIERS } = root.ProduceData;
 
-  // Titles that name a fruit or vegetable but aren't the produce itself — the
-  // residue rankings don't transfer to juice or shampoo.
+  // Titles that name a fruit or vegetable but aren't the produce itself. In
+  // nearly every false positive the fruit is a FLAVOR or SCENT modifier —
+  // "Apple & Citrus Laundry Detergent", "Energy Drink Mix, Blueberry" — and the
+  // residue rankings plainly don't transfer to detergent.
   //
   // Prepared forms of the vegetable (riced, steamable, frozen florets, pearls,
-  // pre-cut) are NOT listed here: that's still cauliflower, and the pesticide
-  // advice still applies. Matched as whole words — a substring check reads "tea"
-  // inside "steamable" and silently drops the tile.
+  // pre-cut) are deliberately NOT listed: that's still cauliflower, and the
+  // pesticide advice still applies.
+  //
+  // Matched as whole words. A substring check reads "tea" inside "steamable"
+  // and silently drops the tile — that bug shipped once already.
   const NON_PRODUCE = [
-    'juice', 'jam', 'jelly', 'preserve', 'preserves', 'yogurt', 'ice cream', 'smoothie',
-    'candle', 'soap', 'shampoo', 'lotion', 'candy', 'gummy', 'gummies', 'soda', 'seltzer',
-    'flavored', 'scented', 'pie', 'cake', 'cookie', 'cookies', 'cereal', 'chips', 'crisps',
-    'sauce', 'salsa', 'dressing', 'vinegar', 'oil', 'extract', 'syrup', 'tea', 'kombucha',
-    'supplement', 'vitamin', 'vitamins', 'jerky', 'pizza', 'crust', 'hummus', 'dip',
+    // household / personal care — the fruit is a scent
+    'detergent', 'laundry', 'softener', 'bleach', 'cleaner', 'cleaning', 'spray',
+    'freshener', 'wipes', 'sanitizer', 'deodorant', 'candle', 'soap', 'shampoo',
+    'conditioner', 'lotion', 'fragrance', 'perfume', 'scented', 'scent',
+    // beverages — the fruit is a flavor
+    'drink', 'drinks', 'beverage', 'soda', 'cola', 'seltzer', 'sparkling', 'energy',
+    'electrolyte', 'juice', 'lemonade', 'smoothie', 'shake', 'coffee', 'latte', 'tea',
+    'kombucha', 'beer', 'wine', 'vodka', 'seltzers', 'cider', 'drink mix', 'water',
+    // packaged food — the fruit is a flavor
+    'flavored', 'flavor', 'candy', 'gummy', 'gummies', 'chocolate', 'cookie', 'cookies',
+    'cake', 'pie', 'muffin', 'granola', 'cereal', 'bar', 'bars', 'chips', 'crisps',
+    'crackers', 'snack', 'yogurt', 'ice cream', 'creamer', 'pudding', 'jerky',
+    'jam', 'jelly', 'preserve', 'preserves', 'syrup', 'sauce', 'salsa', 'dressing',
+    'vinegar', 'oil', 'extract', 'hummus', 'dip', 'pizza', 'crust', 'powder',
+    // supplements
+    'supplement', 'supplements', 'vitamin', 'vitamins', 'protein', 'collagen',
   ];
+
+  // Fresh produce is never sold by fluid volume. A liquid measure is proof the
+  // item is a drink or a cleaner, whatever else the title claims — this catches
+  // packaged goods whose vocabulary isn't in the blocklist above.
+  const LIQUID_UNITS = ['fl oz', 'fluid ounce', 'fluid ounces', 'liter', 'liters', 'ml', 'gallon'];
 
   function normalize(title) {
     return String(title || '')
@@ -45,7 +65,8 @@
   }
 
   function looksProcessed(normalized) {
-    return NON_PRODUCE.some((phrase) => containsPhrase(normalized, phrase));
+    return NON_PRODUCE.some((phrase) => containsPhrase(normalized, phrase)) ||
+      LIQUID_UNITS.some((unit) => containsPhrase(normalized, unit));
   }
 
   // Returns { entry, tier, badge, advice, organic, matchedAlias } or null.

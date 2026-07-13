@@ -52,6 +52,22 @@ const SCREENSHOT_TILES = [
 ];
 CASES.push(...SCREENSHOT_TILES);
 
+// Guard against over-blocking. Expanding NON_PRODUCE to kill flavor/scent false
+// positives can easily start eating real produce: "spring mix" vs "drink mix",
+// "watermelon" vs "water", "celery sticks" vs "powder sticks", "snacking
+// peppers" vs "snack". These must all still classify.
+const MUST_STILL_MATCH = [
+  ['Organic Spring Mix, 5 oz', 'lettuce', 'moderate', true],
+  ['Seedless Watermelon, 1 each', 'watermelon', 'clean', false],
+  ['Wegmans Celery Sticks, 16 oz', 'celery', 'caution', false],
+  ['Organic Blueberries, 1 pt', 'blueberries', 'dirty', true],
+  ['Fresh Strawberries, 2 lb', 'strawberries', 'dirty', false],
+  ['Wegmans Baby Carrots, 1 lb', 'carrots', 'clean', false],
+  ['Organic Baby Spinach, 5 oz', 'spinach', 'dirty', true],
+  ['Sweet Onions, 3 lb Bag', 'onion', 'clean', false],
+];
+CASES.push(...MUST_STILL_MATCH);
+
 const NON_MATCHES = [
   'Simply Orange Juice, 52 fl oz',
   'Strawberry Ice Cream, 1 pt',
@@ -62,7 +78,23 @@ const NON_MATCHES = [
   'Spinach & Artichoke Dip',
   // Glued size must not break the NON_PRODUCE phrase match either.
   'Organic Strawberry Ice Cream1 pt',
-];
+
+  // FALSE POSITIVES seen live: the fruit is a scent/flavor, not the product.
+  // Both were greyed out as Dirty Dozen items on a real Instacart page.
+  ['$17.29Spend $20, save $3HEX Apple & Citrus Laundry Detergent50 fl oz'],
+  ['$13.29Celsius On-the-Go On The Go Energy Drink Mix, Blueberry...2.7 oz'],
+  // Neighbours of the above — same product line, different flavor words.
+  ['Celsius On The Go Energy Drink Mix, Dragonfruit Lime2.7 oz'],
+  ['Celsius On The Go Energy Drink Mix, Berry Powder Sticks2.5 oz'],
+  // The fl-oz rule alone must kill these, even with no blocklist word present.
+  ['Strawberry Sparkling Water, 12 fl oz'],
+  ['Blueberry Hand Soap, 8 fl oz'],
+  // More scent/flavor shapes.
+  'Apple Cinnamon Air Freshener',
+  'Peach Scented Candle',
+  'Spinach & Kale Protein Powder',
+  'Grape Flavored Gummy Vitamins',
+].flat();
 
 let failed = 0;
 for (const [title, key, tier, organic] of CASES) {
