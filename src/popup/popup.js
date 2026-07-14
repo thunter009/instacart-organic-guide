@@ -11,15 +11,29 @@
     scanPage: document.getElementById('scan-page'),
   };
 
+  // Built with DOM nodes rather than innerHTML: nothing here is user-controlled,
+  // but AMO review flags every innerHTML assignment, so keep the popup clean.
+  function el(tag, text, attrs) {
+    const node = document.createElement(tag);
+    if (text) node.textContent = text;
+    for (const k in attrs) node.setAttribute(k, attrs[k]);
+    return node;
+  }
+
   function renderStaleness() {
     const s = staleness(new Date());
     els.updated.textContent = `List updated ${s.updated}`;
     if (!s.isStale) return;
     els.stale.hidden = false;
-    els.stale.innerHTML =
-      `<strong>⚠ This list is ${s.months} months old.</strong> ` +
-      `EWG republishes the Shopper's Guide annually. Rankings have likely shifted — ` +
-      `refresh <code>src/data/produce.js</code> from <a href="${s.source}" target="_blank" rel="noreferrer">ewg.org/foodnews</a>.`;
+    els.stale.textContent = '';
+    els.stale.append(
+      el('strong', `⚠ This list is ${s.months} months old. `),
+      document.createTextNode('EWG republishes the Shopper’s Guide annually. Rankings have likely shifted — refresh '),
+      el('code', 'src/data/produce.js'),
+      document.createTextNode(' from '),
+      el('a', 'ewg.org/foodnews', { href: s.source, target: '_blank', rel: 'noreferrer' }),
+      document.createTextNode('.'),
+    );
   }
 
   const ORDER = ['dirty', 'caution', 'moderate', 'clean'];
@@ -45,7 +59,11 @@
     for (const [tier, list] of groups) {
       const section = document.createElement('section');
       const h = document.createElement('h2');
-      h.innerHTML = `<span class="dot dot--${tier}"></span>${TIERS[tier].badge} <em>${TIERS[tier].advice}</em>`;
+      h.append(
+        el('span', '', { class: `dot dot--${tier}` }),
+        document.createTextNode(`${TIERS[tier].badge} `),
+        el('em', TIERS[tier].advice),
+      );
       section.appendChild(h);
 
       const ul = document.createElement('ul');
