@@ -1,3 +1,5 @@
 node_modules/
 *.xpi
 web-ext-artifacts/
+web-ext-artifacts/
+.amo-credentials
