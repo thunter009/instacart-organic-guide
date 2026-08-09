@@ -43,3 +43,22 @@
 /* Shown when the Dirty Dozen item has NO organic alternative on the page —
    dimming the only option available would be a dead end. */
 .io-note { background: #5c6670; }
+
+/* Product detail page: a banner under the title, not a corner chip. There's
+   only one product here and it's the whole reason for the page, so the verdict
+   gets stated in words rather than implied by dimming. */
+.io-pdp {
+  display: block;
+  margin: 8px 0 12px;
+  padding: 8px 12px;
+  border-left: 4px solid currentColor;
+  border-radius: 3px;
+  font: 700 12px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0.04em;
+}
+
+.io-pdp--organic  { color: #0f5132; background: #d1e7dd; }
+.io-pdp--dirty    { color: #842029; background: #f8d7da; }
+.io-pdp--caution  { color: #664d03; background: #fff3cd; }
+.io-pdp--moderate { color: #41464b; background: #e2e3e5; }
+.io-pdp--clean    { color: #0f5132; background: #d1e7dd; }

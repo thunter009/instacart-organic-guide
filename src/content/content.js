@@ -24,6 +24,15 @@
   // card container classes makes this independent of tile layout.
   const PRODUCT_LINK = 'a[href*="/products/"]';
 
+  // The product detail page is the one view with no tile to treat: the item
+  // you're looking at isn't a link to itself, so the grid logic above sees
+  // nothing (only the related-item carousels below it). That's the view where
+  // the buy decision actually happens, so it gets its own treatment — a banner
+  // under the title rather than dimming, since dimming the page you chose to
+  // open is useless.
+  const PDP_CLASS = 'io-pdp';
+  const PDP_PATH = /\/products\//;
+
   const CART_SELECTORS = [
     '[data-testid="cart-sidesheet"]',
     '[data-testid="cart-side-sheet"]',
@@ -68,7 +77,10 @@
   function textWithoutBadges(node) {
     if (node.nodeType === 3) return node.nodeValue || '';
     if (node.nodeType !== 1) return '';
-    if (node.classList && (node.classList.contains(BADGE_CLASS) || node.classList.contains(NOTE_CLASS))) return '';
+    if (node.classList &&
+        (node.classList.contains(BADGE_CLASS) ||
+         node.classList.contains(NOTE_CLASS) ||
+         node.classList.contains(PDP_CLASS))) return '';
     let text = '';
     for (const child of node.childNodes) {
       const t = textWithoutBadges(child);
@@ -161,7 +173,54 @@
     if (!state.hidden && tile.classList.contains('io-hidden')) tile.classList.remove('io-hidden');
   }
 
+  // The <h1> on a product page is the product name. Guarding on the path
+  // matters: every other Instacart view has an <h1> too (the store name, the
+  // aisle), and classifying those would banner the whole storefront.
+  function heroTitle() {
+    if (!PDP_PATH.test(location.pathname)) return null;
+    const h1 = document.querySelector('h1');
+    if (!h1) return null;
+    const title = textWithoutBadges(h1).trim();
+    return title ? { h1, title, verdict: classify(title) } : null;
+  }
+
+  // On a tile, silence means "conventional is fine" — badging every clean item
+  // would be noise across a whole grid. A product page is one deliberate item,
+  // so the clean and moderate verdicts are worth stating outright: "save your
+  // money here" is the advice people most often get wrong.
+  function heroBanner(verdict) {
+    const el = document.createElement('div');
+    const mod = verdict.organic ? 'organic' : verdict.tier;
+    el.className = `${PDP_CLASS} ${PDP_CLASS}--${mod}`;
+    el.textContent = verdict.organic ? '✓ ORGANIC' : verdict.badge;
+    el.title = `${verdict.label} — ${verdict.advice}`;
+    return el;
+  }
+
+  // Same convergence contract as applyTile: idempotent, and re-derived every
+  // sweep rather than memoized. SPA navigation swaps the <h1> in place without
+  // a reload, so a stale banner has to be removable on any sweep.
+  function applyHero() {
+    const existing = document.querySelector('.' + PDP_CLASS);
+    const hero = heroTitle();
+
+    if (!hero || !hero.verdict) {
+      if (existing) existing.remove();
+      return;
+    }
+
+    const wanted = heroBanner(hero.verdict);
+    if (existing &&
+        existing.className === wanted.className &&
+        existing.textContent === wanted.textContent) return;
+    if (existing) existing.remove();
+
+    const parent = hero.h1.parentNode;
+    if (parent) parent.insertBefore(wanted, hero.h1.nextSibling);
+  }
+
   function sweep() {
+    applyHero();
     const links = productLinks();
 
     // Pass 1: classify. A tile whose title hasn't streamed in yet is skipped
@@ -228,7 +287,14 @@
     }
     if (msg.type === 'SCAN_PAGE') {
       sweep();
-      return Promise.resolve({ scope: 'page', items: collect(document) });
+      // The hero product has no tile, so collect() can't see it. On a product
+      // page it's the item the user is asking about — list it first.
+      const hero = heroTitle();
+      const items = collect(document);
+      if (hero && hero.verdict && !items.some((i) => i.title === hero.title)) {
+        items.unshift({ title: hero.title, ...hero.verdict });
+      }
+      return Promise.resolve({ scope: 'page', items });
     }
     if (msg.type === 'AUDIT_CART') {
       const cart = findCart();
@@ -252,7 +318,7 @@
 
   // Test hook for test/content.dom.test.js; inert in production.
   window.__ioContentInternals = {
-    productLinks, titleOf, tileOf, sweep, collect,
+    productLinks, titleOf, tileOf, sweep, collect, heroTitle, applyHero,
     setHideMode: (v) => { hideMode = v; },
   };
 })();

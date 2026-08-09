@@ -29,6 +29,11 @@ Two things keep the dimming honest:
   `NO ORGANIC OPTION` instead. It's recomputed every sweep, so an organic tile that
   lazy-loads in later flips its whole group to demoted.
 
+**Product pages get words, not dimming.** On `/products/…` there's one item and it's
+the reason you're there, so it gets a banner under the title instead — and unlike the
+grid, the Clean Fifteen verdict is stated outright. "Save your money on avocados" is the
+half of the advice people most often miss.
+
 **Prepared forms count as the vegetable.** Riced, steamable, frozen, and pre-cut
 cauliflower classify the same as the fresh head; residue carries through. Only genuinely
 different products (juice, sauce, pizza crust, shampoo) are skipped.
