@@ -1,25 +1,30 @@
 #!/usr/bin/env bash
 # Sign + submit the extension to addons.mozilla.org (listed channel).
 #
-# Credentials are read from the environment and never printed. Get them from:
-#   https://addons.mozilla.org/en-US/developers/addon/api/key/
-# and provide them one of two ways:
+#   bash tools/sign.sh
 #
-#   A) Bitwarden (durable, survives re-signs):
-#        export BW_SESSION=$(bwbio unlock --raw)
-#        export WEB_EXT_API_KEY=$(bw get username "AMO API key" --raw)
-#        export WEB_EXT_API_SECRET=$(bw get password "AMO API key" --raw)
+# Credentials come from Bitwarden by default — see tools/amo-creds.sh, which
+# finds the vault item carrying "JWT Issuer" / "JWT Secret" custom fields.
+# Generate them at https://addons.mozilla.org/en-US/developers/addon/api/key/
 #
-#   B) One-off, this shell only:
-#        read -rs WEB_EXT_API_KEY;    export WEB_EXT_API_KEY
-#        read -rs WEB_EXT_API_SECRET; export WEB_EXT_API_SECRET
-#
-# Then: bash tools/sign.sh
+# To bypass Bitwarden, set both in the environment first and this script uses
+# them as-is (read -rs so the secret never lands in shell history):
+#   read -rs WEB_EXT_API_KEY;    export WEB_EXT_API_KEY
+#   read -rs WEB_EXT_API_SECRET; export WEB_EXT_API_SECRET
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-: "${WEB_EXT_API_KEY:?set WEB_EXT_API_KEY (JWT issuer, looks like user:12345:67)}"
-: "${WEB_EXT_API_SECRET:?set WEB_EXT_API_SECRET}"
+trap 'unset WEB_EXT_API_KEY WEB_EXT_API_SECRET 2>/dev/null || true' EXIT
+
+if [[ -z "${WEB_EXT_API_KEY:-}" || -z "${WEB_EXT_API_SECRET:-}" ]]; then
+  # shellcheck source=tools/amo-creds.sh
+  . "$(dirname "$0")/amo-creds.sh"
+fi
+: "${WEB_EXT_API_KEY:?no AMO issuer resolved}"
+: "${WEB_EXT_API_SECRET:?no AMO secret resolved}"
+
+echo "Running tests…"
+node --test test/*.test.js
 
 echo "Linting…"
 npx --yes web-ext lint --source-dir .
@@ -29,6 +34,10 @@ echo "Submitting to AMO (listed channel)…"
 # .xpi lands in web-ext-artifacts/ once/if AMO auto-approves; a listed addon
 # still needs its listing page (summary, description, screenshots, categories)
 # completed on the AMO dashboard before review can finish.
+#
+# The credentials go in as argv here because web-ext offers no stdin path —
+# they are visible to `ps` for the duration of the upload. That is the one
+# unavoidable exposure in this flow.
 npx --yes web-ext sign \
   --source-dir . \
   --channel=listed \
