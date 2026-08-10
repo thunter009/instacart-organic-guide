@@ -4,3 +4,4 @@ web-ext-artifacts/
 web-ext-artifacts/
 .amo-credentials
 .DS_Store
+.amo-upload-uuid
