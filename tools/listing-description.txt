@@ -1,0 +1,18 @@
+Organic produce costs 30–100% more. On some items that premium buys you a real reduction in pesticide residue. On others it buys you almost nothing. This extension makes that difference visible while you shop, so you spend the money where it counts.
+
+It uses the Environmental Working Group's annual Shopper's Guide to Pesticides in Produce — the Dirty Dozen and Clean Fifteen — and applies it directly to the Instacart page:
+
+• Conventional Dirty Dozen (strawberries, spinach, grapes…) is greyed out and faded, or hidden entirely if you prefer.
+• Higher-residue items (peppers, green beans, celery, tomatoes) are faded lightly.
+• Organic items get a check.
+• Clean Fifteen and middle-of-the-pack produce is left alone. Silence means conventional is fine.
+
+On a product page you get the verdict in words, including "conventional is fine" — the half of the advice people usually miss.
+
+Two things keep it honest. Demotion is advice, not a wall: a dimmed item restores on hover and stays clickable, so you can always overrule it. And dimming is skipped when the store stocks no organic alternative, because greying out the only option available helps nobody.
+
+The toolbar popup audits your cart for worthwhile organic swaps, and warns you when the bundled EWG list is more than a year old.
+
+No data collection. No network requests. Runs only on instacart.com.
+
+Source code: https://github.com/thunter009/instacart-organic-guide
