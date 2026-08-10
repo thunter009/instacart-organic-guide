@@ -59,8 +59,13 @@ if [ "$_amo_count" -gt 1 ]; then
   return 1
 fi
 
-WEB_EXT_API_KEY=$(printf '%s' "$_amo_matches" | jq -r '.[0].issuer')
-WEB_EXT_API_SECRET=$(printf '%s' "$_amo_matches" | jq -r '.[0].secret')
+# Strip ALL whitespace, not just the ends. Pasting from the AMO key page tends
+# to carry a trailing newline into the vault field, and web-ext sends the value
+# verbatim — AMO then answers `401 Error decoding signature`, which reads like a
+# wrong key rather than a stray \n. Neither value legitimately contains spaces:
+# the issuer is user:N:N and the secret is hex.
+WEB_EXT_API_KEY=$(printf '%s' "$_amo_matches" | jq -r '.[0].issuer' | tr -d '[:space:]')
+WEB_EXT_API_SECRET=$(printf '%s' "$_amo_matches" | jq -r '.[0].secret' | tr -d '[:space:]')
 export WEB_EXT_API_KEY WEB_EXT_API_SECRET
 unset _amo_matches _amo_count
 

@@ -38,9 +38,13 @@ echo "Submitting to AMO (listed channel)…"
 # The credentials go in as argv here because web-ext offers no stdin path —
 # they are visible to `ps` for the duration of the upload. That is the one
 # unavoidable exposure in this flow.
+#
+# --amo-metadata carries the license: a listed version is rejected without one
+# (400, "This field, or custom_license, is required"). It matches ./LICENSE.
 npx --yes web-ext sign \
   --source-dir . \
   --channel=listed \
+  --amo-metadata="$(dirname "$0")/amo-metadata.json" \
   --api-key="$WEB_EXT_API_KEY" \
   --api-secret="$WEB_EXT_API_SECRET"
 
