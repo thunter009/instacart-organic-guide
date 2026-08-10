@@ -38,6 +38,18 @@
     'sausage', 'bacon', 'ham', 'salami', 'deli', 'patty', 'burger', 'meatball',
     // condiments
     'relish', 'chutney', 'compote', 'marinade', 'glaze',
+    // canned and jarred. FROZEN IS DELIBERATELY ABSENT — the two are not
+    // equivalent here:
+    //   - EWG "ranks popular FRESH fruits and vegetables" (methodology.php),
+    //     so a ranking built on fresh peaches doesn't describe a can of them.
+    //   - Canning (wash, peel, blanch, then >115°C sterilization) removes
+    //     90–100% of residues in most products — peaches keep only trace
+    //     acephate. https://pmc.ncbi.nlm.nih.gov/articles/PMC3907644
+    //   - Freezing removes nothing: thiram in frozen plums held >80% after 49
+    //     weeks at -20°C, and frozen spinach was unchanged over ten months.
+    //     Reductions in frozen VEG come from pre-freeze blanching; fruit is
+    //     usually IQF unblanched, so frozen berries track fresh closely.
+    'canned', 'jarred', 'pickled',
     // supplements
     'supplement', 'supplements', 'vitamin', 'vitamins', 'protein', 'collagen',
   ];

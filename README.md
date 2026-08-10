@@ -34,6 +34,14 @@ the reason you're there, so it gets a banner under the title instead — and unl
 grid, the Clean Fifteen verdict is stated outright. "Save your money on avocados" is the
 half of the advice people most often miss.
 
+**Frozen counts; canned doesn't.** EWG "ranks popular *fresh* fruits and vegetables,"
+so the question is whether a given form still carries a fresh item's residue profile.
+Freezing removes nothing — thiram in frozen plums held above 80% after 49 weeks at
+−20 °C — and fruit is usually frozen without the blanching step that does reduce
+residues. Canning is the opposite: wash, peel, blanch, then sterilize above 115 °C
+strips [90–100% of residues](https://pmc.ncbi.nlm.nih.gov/articles/PMC3907644). So
+frozen strawberries get the Dirty Dozen treatment and canned peaches are ignored.
+
 **Prepared forms count as the vegetable.** Riced, steamable, frozen, and pre-cut
 cauliflower classify the same as the fresh head; residue carries through. Only genuinely
 different products (juice, sauce, pizza crust, shampoo) are skipped.

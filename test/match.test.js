@@ -30,6 +30,11 @@ const CASES = [
   ['Creamer Potatoes, 1.5 lb', 'potatoes', 'dirty', false],
   ['Organic Creamer Potatoes', 'potatoes', 'dirty', true],
   ['Butter Lettuce, 1 head', 'lettuce', 'moderate', false],
+  // Frozen still counts: freezing does not degrade residues, and fruit is
+  // typically frozen without the blanching step that reduces them.
+  ['Wegmans Frozen Sliced Strawberries, 16 oz', 'strawberries', 'dirty', false],
+  ['Wegmans Organic Frozen Strawberries, 12 oz', 'strawberries', 'dirty', true],
+  ['Frozen Chopped Spinach, 10 oz', 'spinach', 'dirty', false],
 ];
 
 // Real tiles from a Wegmans "cauliflower" search. Prepared forms are still the
@@ -116,6 +121,13 @@ const NON_MATCHES = [
   'Coffee Creamer, French Vanilla',
   'Cream of Potato Soup',
   'Lettuce Wrap Kit with Peanut Sauce',
+  // Canned and jarred: EWG ranks fresh produce, and canning strips 90–100% of
+  // residues. These were being dimmed on a live "peach" search.
+  'Wegmans Canned Yellow Cling Sliced Peaches',
+  'Wegmans Old-Fashioned Peach Slices in Light Syrup',
+  'Del Monte Sliced Peaches in Heavy Syrup, 15 oz',
+  'Jarred Roasted Red Peppers',
+  'Pickled Beets, 16 oz',
 ].flat();
 
 let failed = 0;
