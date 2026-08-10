@@ -30,6 +30,14 @@
     'crackers', 'snack', 'yogurt', 'ice cream', 'creamer', 'pudding', 'jerky',
     'jam', 'jelly', 'preserve', 'preserves', 'syrup', 'sauce', 'salsa', 'dressing',
     'vinegar', 'oil', 'extract', 'hummus', 'dip', 'pizza', 'crust', 'powder',
+    // dairy & deli — the fruit is a flavor ("Goat Cheese, Strawberry Spritz")
+    'cheese', 'creamery', 'cream', 'butter', 'milk', 'kefir', 'cottage',
+    'ricotta', 'mozzarella', 'cheddar', 'gouda', 'brie', 'feta', 'spread',
+    'spritz', 'custard', 'mousse', 'gelato', 'sorbet', 'sherbet', 'frosting',
+    // prepared meats — same story ("Apple Chicken Sausage")
+    'sausage', 'bacon', 'ham', 'salami', 'deli', 'patty', 'burger', 'meatball',
+    // condiments
+    'relish', 'chutney', 'compote', 'marinade', 'glaze',
     // supplements
     'supplement', 'supplements', 'vitamin', 'vitamins', 'protein', 'collagen',
   ];
@@ -64,9 +72,29 @@
     return containsPhrase(normalize(title), 'organic');
   }
 
+  // Fresh produce whose NAME contains a blocklisted word. "Creamer potatoes"
+  // are potatoes — Dirty Dozen — but "creamer" reads as coffee creamer and
+  // silently dropped them; "butter lettuce" is lettuce, not dairy.
+  //
+  // These are stripped before the processed-food check only. Classification
+  // still sees the untouched title, so the produce word itself survives.
+  const FRESH_PHRASES = [
+    'butter lettuce', 'creamer potato', 'creamer potatoes', 'cream peas',
+  ];
+
+  function withoutFreshPhrases(normalized) {
+    let out = normalized;
+    for (const phrase of FRESH_PHRASES) {
+      const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      out = out.replace(new RegExp('(^|\\s)' + escaped + '(\\s|$)', 'g'), ' ');
+    }
+    return out.replace(/\s+/g, ' ').trim();
+  }
+
   function looksProcessed(normalized) {
-    return NON_PRODUCE.some((phrase) => containsPhrase(normalized, phrase)) ||
-      LIQUID_UNITS.some((unit) => containsPhrase(normalized, unit));
+    const scanned = withoutFreshPhrases(normalized);
+    return NON_PRODUCE.some((phrase) => containsPhrase(scanned, phrase)) ||
+      LIQUID_UNITS.some((unit) => containsPhrase(scanned, unit));
   }
 
   // Returns { entry, tier, badge, advice, organic, matchedAlias } or null.

@@ -25,6 +25,11 @@ const CASES = [
   ['Green Bell Pepper', 'bell-peppers', 'caution', false],
   ['Ruby Red Grapefruit', 'grapefruit', 'moderate', false],
   ['Organic Baby Spinach, 5 oz', 'spinach', 'dirty', true],
+  // Fresh produce whose name contains a blocklisted word. Creamer potatoes are
+  // Dirty Dozen and were being dropped silently by the "creamer" blocker.
+  ['Creamer Potatoes, 1.5 lb', 'potatoes', 'dirty', false],
+  ['Organic Creamer Potatoes', 'potatoes', 'dirty', true],
+  ['Butter Lettuce, 1 head', 'lettuce', 'moderate', false],
 ];
 
 // Real tiles from a Wegmans "cauliflower" search. Prepared forms are still the
@@ -94,6 +99,23 @@ const NON_MATCHES = [
   'Peach Scented Candle',
   'Spinach & Kale Protein Powder',
   'Grape Flavored Gummy Vitamins',
+  // Dairy, deli and confections where the fruit is a flavor. The goat cheese
+  // was a live false positive: it wore a NO ORGANIC OPTION note on a real
+  // search grid because "Strawberry" matched.
+  'Vermont Creamery Goat Cheese, Strawberry Spritz, Smooth & Sweet',
+  'Strawberry Cream Cheese Spread',
+  'Blueberry Greek Yogurt, 5.3 oz',
+  'Peach Cottage Cheese',
+  'Apple Chicken Sausage, 12 oz',
+  'Cherry Almond Gelato',
+  'Blackberry Fruit Spread',
+  'Apple Cider Donut Creamer',
+  'Mango Habanero Glaze',
+  'Cranberry Orange Relish',
+  // The exceptions above must not punch holes in the blocklist itself.
+  'Coffee Creamer, French Vanilla',
+  'Cream of Potato Soup',
+  'Lettuce Wrap Kit with Peanut Sauce',
 ].flat();
 
 let failed = 0;

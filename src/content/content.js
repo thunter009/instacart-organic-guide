@@ -31,7 +31,17 @@
   // under the title rather than dimming, since dimming the page you chose to
   // open is useless.
   const PDP_CLASS = 'io-pdp';
-  const PDP_PATH = /\/products\//;
+
+  // The product slug in the URL, minus its leading numeric id:
+  //   /products/17327024-organic-strawberries-package-32-oz
+  //             -> "organic strawberries package 32 oz"
+  //
+  // The URL is the title source, NOT the DOM. Instacart opens a product as a
+  // MODAL over whatever you were looking at, so the first <h1> on a product
+  // page is still the search heading — reading it classified
+  // `Results for "strawberries"` and stamped BUY ORGANIC onto a page of
+  // organic strawberries. The slug is unambiguous and can't drift with layout.
+  const PDP_PATH = /\/products\/(?:\d+-)?([^/?#]+)/;
 
   const CART_SELECTORS = [
     '[data-testid="cart-sidesheet"]',
@@ -173,15 +183,27 @@
     if (!state.hidden && tile.classList.contains('io-hidden')) tile.classList.remove('io-hidden');
   }
 
-  // The <h1> on a product page is the product name. Guarding on the path
-  // matters: every other Instacart view has an <h1> too (the store name, the
-  // aisle), and classifying those would banner the whole storefront.
+  // Read the product name off the URL. See PDP_PATH: the DOM heading belongs to
+  // the page BEHIND the modal, so it names the wrong product.
   function heroTitle() {
-    if (!PDP_PATH.test(location.pathname)) return null;
+    const match = PDP_PATH.exec(location.pathname);
+    if (!match) return null;
+    const title = decodeURIComponent(match[1]).replace(/-/g, ' ').trim();
+    if (!title) return null;
+    const verdict = classify(title);
+    return verdict ? { title, verdict } : null;
+  }
+
+  // Where the banner goes. The modal is the product; anything outside it
+  // belongs to the page the user was on before, so a banner there would
+  // annotate the wrong thing.
+  function heroAnchor() {
+    const dialog = document.querySelector('[role="dialog"], [aria-modal="true"]');
+    if (dialog) return { node: dialog, position: 'inside' };
+    // Direct navigation renders the product as a full page, where the first
+    // heading really is the product name.
     const h1 = document.querySelector('h1');
-    if (!h1) return null;
-    const title = textWithoutBadges(h1).trim();
-    return title ? { h1, title, verdict: classify(title) } : null;
+    return h1 ? { node: h1, position: 'after' } : null;
   }
 
   // On a tile, silence means "conventional is fine" — badging every clean item
@@ -203,20 +225,30 @@
   function applyHero() {
     const existing = document.querySelector('.' + PDP_CLASS);
     const hero = heroTitle();
+    const anchor = hero ? heroAnchor() : null;
 
-    if (!hero || !hero.verdict) {
+    if (!hero || !anchor) {
       if (existing) existing.remove();
       return;
     }
 
     const wanted = heroBanner(hero.verdict);
-    if (existing &&
+    const placed = anchor.position === 'inside'
+      ? existing && existing.parentNode === anchor.node
+      : existing && existing.parentNode === anchor.node.parentNode;
+
+    if (placed &&
         existing.className === wanted.className &&
         existing.textContent === wanted.textContent) return;
+    // Either the verdict changed or the modal re-mounted around a different
+    // product, leaving our banner attached to a stale container.
     if (existing) existing.remove();
 
-    const parent = hero.h1.parentNode;
-    if (parent) parent.insertBefore(wanted, hero.h1.nextSibling);
+    if (anchor.position === 'inside') {
+      anchor.node.insertBefore(wanted, anchor.node.firstChild);
+    } else if (anchor.node.parentNode) {
+      anchor.node.parentNode.insertBefore(wanted, anchor.node.nextSibling);
+    }
   }
 
   function sweep() {

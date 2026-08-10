@@ -70,6 +70,7 @@ class Element {
     else this.childNodes.push(node);
     return node;
   }
+  get firstChild() { return this.childNodes[0] || null; }
   get nextSibling() {
     if (!this.parentNode) return null;
     const sibs = this.parentNode.childNodes;
@@ -97,6 +98,9 @@ class Element {
   }
   matches(sel) {
     if (sel.startsWith('.')) return this.classList.contains(sel.slice(1));
+    // Bare attribute selectors: [role="dialog"], [aria-modal="true"]
+    const bare = sel.match(/^\[([-\w]+)="([^"]*)"\]$/);
+    if (bare) return this.getAttribute(bare[1]) === bare[2];
     const attr = sel.match(/^([a-z]+)\[([-\w]+)\*="([^"]*)"\]$/i);
     if (attr) {
       return this.tagName === attr[1].toUpperCase() &&
@@ -330,70 +334,86 @@ check('demoting one tile leaves its neighbours untouched',
 // --- 14. Product detail page: the hero item, which has no tile ---------------
 // The item you opened isn't a link to itself, so the grid logic never sees it.
 // This is the view where the buy decision happens, so it gets a banner.
+//
+// The title comes from the URL slug, NOT the DOM. Observed on a live page:
+// Instacart opens a product in a MODAL over the search results, so the page's
+// <h1> still reads `Results for "strawberries"`. Classifying that heading
+// stamped BUY ORGANIC across a page of ORGANIC strawberries — the exact
+// inversion of the advice. The regression test for it is below.
 const banner = () => body.querySelector('.io-pdp');
 
-// The <h1> exists on every view. Off a product page it must be ignored, or the
-// store name gets classified and the whole storefront wears a verdict.
-const pdpHeading = new Element('h1');
-pdpHeading.textContent = 'Driscoll’s Strawberries';
-const pdpWrap = new Element('div');
-pdpWrap.appendChild(pdpHeading);
-body.appendChild(pdpWrap);
+// The search page underneath, with its own heading — deliberately naming a
+// DIFFERENT product than the URL does.
+const searchHeading = new Element('h1');
+searchHeading.textContent = 'Results for "strawberries"';
+body.appendChild(searchHeading);
 
-sandbox.location.pathname = '/store/wegmans/s';
+sandbox.location.pathname = '/store/wegmans/storefront';
 sweep();
 check('an <h1> off a product page is never bannered', banner() === null);
 
-sandbox.location.pathname = '/store/items/products/9001';
+// The live bug, verbatim.
+sandbox.location.pathname = '/products/17327024-organic-strawberries-package-32-oz';
 sweep();
-check('conventional Dirty Dozen hero gets a banner', banner() !== null);
-check('hero banner carries the dirty modifier',
-  banner() && banner().classList.contains('io-pdp--dirty'));
-check('hero banner sits directly after the title, not inside it',
-  pdpHeading.nextSibling === banner() && pdpHeading.querySelectorAll('.io-pdp').length === 0);
-check('hero is NOT dimmed — dimming the page you opened is useless',
-  !pdpWrap.classList.contains('io-demote--strong') &&
-  !pdpWrap.classList.contains('io-demote--light'));
+check('modal PDP reads the URL, not the search heading behind it',
+  heroTitle() && heroTitle().title === 'organic strawberries package 32 oz');
+check('organic product on a "strawberries" search is NOT told to buy organic',
+  banner() !== null && banner().classList.contains('io-pdp--organic'));
+check('banner text matches the organic verdict', banner().textContent === '✓ ORGANIC');
+
+// With a modal present the banner belongs INSIDE it — anything outside the
+// modal is the page the user was on before, and annotating that is wrong.
+const modal = new Element('div');
+modal.setAttribute('role', 'dialog');
+body.appendChild(modal);
+sweep();
+check('banner moves inside the modal when one exists', modal.firstChild === banner());
+check('banner is not left behind outside the modal',
+  body.querySelectorAll('.io-pdp').length === 1);
 
 // Idempotence: content.js's own MutationObserver re-fires on every write, so a
 // sweep that re-inserted the banner each time would loop forever.
-const first = banner();
+const firstBanner = banner();
 sweep();
 sweep();
 check('repeated sweeps neither duplicate nor replace the banner',
-  body.querySelectorAll('.io-pdp').length === 1 && banner() === first);
+  body.querySelectorAll('.io-pdp').length === 1 && banner() === firstBanner);
 
-// Our banner text ("BUY ORGANIC") must not feed back into the title on the
-// next sweep the way the tile badge once did.
-check('banner text does not leak into the hero title',
-  heroTitle().title === 'Driscoll’s Strawberries');
-
-// An organic hero flips the verdict rather than keeping the conventional one.
-pdpHeading.textContent = 'Driscoll’s Organic Strawberries';
+// Conventional item: the same slug shape without "organic".
+sandbox.location.pathname = '/products/17327025-driscolls-strawberries-16-oz';
 sweep();
-check('organic hero re-classifies on the same page',
-  banner().classList.contains('io-pdp--organic') && banner().textContent === '✓ ORGANIC');
+check('conventional Dirty Dozen hero gets the dirty verdict',
+  banner() !== null && banner().classList.contains('io-pdp--dirty'));
+check('hero is NOT dimmed — dimming the page you opened is useless',
+  !modal.classList.contains('io-demote--strong') &&
+  !modal.classList.contains('io-demote--light'));
 
 // Clean Fifteen states the verdict outright here, unlike on a tile: "save your
 // money" is the advice people most often get wrong.
-pdpHeading.textContent = 'Fresh Avocado';
+sandbox.location.pathname = '/products/992-large-hass-avocado-1-each';
 sweep();
 check('Clean Fifteen hero is bannered, not silent',
   banner() !== null && banner().classList.contains('io-pdp--clean'));
 
-// SPA navigation swaps the <h1> without a reload — a stale banner from the
-// previous product would be actively wrong.
-pdpHeading.textContent = 'Charmin Ultra Soft Toilet Paper';
+// A slug with no leading numeric id still resolves.
+sandbox.location.pathname = '/products/fresh-spinach-bunch';
 sweep();
-check('banner removed when the hero is not produce', banner() === null);
+check('slug without a numeric id still classifies', banner() !== null);
 
-pdpHeading.textContent = 'Fresh Spinach';
+// SPA navigation swaps products without a reload — a stale banner from the
+// previous product would be actively wrong.
+sandbox.location.pathname = '/products/551-charmin-ultra-soft-toilet-paper';
 sweep();
-check('banner returns after navigating to another produce item', banner() !== null);
-sandbox.location.pathname = '/store/wegmans/s';
+check('banner removed when the product is not produce', banner() === null);
+
+sandbox.location.pathname = '/products/17327024-organic-strawberries-package-32-oz';
+sweep();
+check('banner returns after navigating to another product', banner() !== null);
+
+sandbox.location.pathname = '/store/wegmans/storefront';
 sweep();
 check('banner removed when navigating off the product page', banner() === null);
 
-const TOTAL = 45;
+const TOTAL = 57;
 console.log(`\n${TOTAL - failed}/${TOTAL} passed`);
 process.exit(failed ? 1 : 0);
