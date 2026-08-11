@@ -46,9 +46,10 @@ def multipart(path, caption):
         ('Content-Disposition: form-data; name="image"; filename="%s"\r\n' % name).encode(),
         ("Content-Type: %s\r\n\r\n" % mime).encode(),
         blob, b"\r\n",
-        ("--%s\r\n" % boundary).encode(),
-        b'Content-Disposition: form-data; name="caption"\r\n\r\n',
-        caption.encode(), b"\r\n",
+        # No caption here. Per the API docs, `position` may accompany `image`
+        # but `caption` may not — it needs a separate JSON PATCH once the
+        # preview exists, because multipart flattens the localized object into
+        # a string and the serializer rejects it.
         ("--%s--\r\n" % boundary).encode(),
     ])
     return body, "multipart/form-data; boundary=%s" % boundary
@@ -77,9 +78,25 @@ def main(args):
         )
         try:
             result = json.load(urllib.request.urlopen(req, timeout=120))
-            print("OK       %s -> preview id=%s" % (path, result.get("id")))
         except urllib.error.HTTPError as exc:
             print("HTTP %s  %s\n         %s" % (exc.code, path, exc.read().decode()[:300]), file=sys.stderr)
+            failed += 1
+            continue
+
+        preview_id = result.get("id")
+        patch = urllib.request.Request(
+            "%s%s/" % (API, preview_id),
+            data=json.dumps({"caption": {"en-US": caption}}).encode(), method="PATCH",
+            headers={"Authorization": "JWT " + jwt("c%d" % i), "Content-Type": "application/json"},
+        )
+        try:
+            stored = json.load(urllib.request.urlopen(patch, timeout=60))
+            got = (stored.get("caption") or {}).get("en-US") or ""
+            print("OK       %s -> id=%s, caption %s" % (
+                path, preview_id, "set (%d chars)" % len(got) if got else "EMPTY"))
+        except urllib.error.HTTPError as exc:
+            print("PARTIAL  %s uploaded as id=%s but caption failed: HTTP %s %s" % (
+                path, preview_id, exc.code, exc.read().decode()[:200]), file=sys.stderr)
             failed += 1
     return 1 if failed else 0
 
