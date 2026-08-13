@@ -41,9 +41,14 @@ echo "Submitting to AMO (listed channel)…"
 #
 # --amo-metadata carries the license: a listed version is rejected without one
 # (400, "This field, or custom_license, is required"). It matches ./LICENSE.
+#
+# --approval-timeout=0 returns as soon as the version is submitted instead of
+# blocking until a human reviewer acts. Listed review takes days, so waiting
+# only risks a caller timing out and making the upload look like it failed.
 npx --yes web-ext sign \
   --source-dir . \
   --channel=listed \
+  --approval-timeout=0 \
   --amo-metadata="$(dirname "$0")/amo-metadata.json" \
   --api-key="$WEB_EXT_API_KEY" \
   --api-secret="$WEB_EXT_API_SECRET"
